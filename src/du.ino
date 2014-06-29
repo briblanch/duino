@@ -1,20 +1,24 @@
 #include <Servo.h>
+
 #include "RCSwitch.h"
 
 bool debug = false;
 
 int index = 0;
 
-char messageBuffer[18];
+char messageBuffer[12];
 char cmd[3];
 char pin[3];
-char val[13];
+char val[4];
 char aux[4];
+
+RCSwitch rc = RCSwitch();
 
 Servo servo;
 
 void setup() {
   Serial.begin(115200);
+      // Transmitter is connected to Arduino Pin #9
 }
 
 void loop() {
@@ -30,50 +34,55 @@ void loop() {
  * Deal with a full message and determine function to call
  */
 void process() {
-  index = 0;
+    index = 0;
 
-  strncpy(cmd, messageBuffer, 2);
-  cmd[2] = '\0';
-  strncpy(pin, messageBuffer + 2, 2);
-  pin[2] = '\0';
+    strncpy(cmd, messageBuffer, 2);
+    cmd[2] = '\0';
+    strncpy(pin, messageBuffer + 2, 2);
+    pin[2] = '\0';
 
-  if (debug) {
-    Serial.println(messageBuffer);
-  }
-  int cmdid = atoi(cmd);
+    int cmdid = atoi(cmd);
 
-  if (cmdid == 96) {
-    strncpy(val, messageBuffer + 4, 12);
-    val[12] = '\0';
-  } else if (cmdid > 90) {
-    strncpy(val, messageBuffer + 4, 2);
-    val[2] = '\0';
-    strncpy(aux, messageBuffer + 6, 3);
-    aux[3] = '\0';
-  } else {
-    strncpy(val, messageBuffer + 4, 3);
-    val[4] = '\0';
-    strncpy(aux, messageBuffer + 7, 3);
-    aux[4] = '\0';
-  }
+    if (cmdid == 95 || cmdid == 96) {
+        Serial.println("Hit RC Command");
+        strncpy(val, messageBuffer + 4, 2);
+        val[2] = '\0';
+ 
+    } else if (atoi(cmd) > 90) {
+        strncpy(val, messageBuffer + 4, 2);
+        val[2] = '\0';
+        strncpy(aux, messageBuffer + 6, 3);
+        aux[3] = '\0';
+    } else {
+        strncpy(val, messageBuffer + 4, 3);
+        val[3] = '\0';
+        strncpy(aux, messageBuffer + 7, 3);
+        aux[3] = '\0';
+    }
 
-  // Serial.println(cmd);
-  // Serial.println(pin);
-  // Serial.println(val);
-  // Serial.println(aux);
+    if (debug) {
+        Serial.println(messageBuffer);
+    }
+    
 
-  switch(cmdid) {
+    // Serial.println(cmd);
+    // Serial.println(pin);
+    // Serial.println(val);
+    // Serial.println(aux);
+
+    switch(cmdid) {
     case 0:  sm(pin,val);              break;
     case 1:  dw(pin,val);              break;
     case 2:  dr(pin,val);              break;
     case 3:  aw(pin,val);              break;
     case 4:  ar(pin,val);              break;
-    case 96: handleRCTriState(pin, val); break;
+    case 95: sendRCOff(pin, val);      break;
+    case 96: sendRCOn(pin, val);
     case 97: handlePing(pin,val,aux);  break;
     case 98: handleServo(pin,val,aux); break;
     case 99: toggleDebug(val);         break;
     default:                           break;
-  }
+    }
 }
 
 /*
@@ -240,6 +249,11 @@ void handleServo(char *pin, char *val, char *aux) {
     servo.write(atoi(aux));
     delay(15);
 
+    // TODO: Experiment with microsecond pulses
+    // digitalWrite(pin, HIGH);   // start the pulse
+    // delayMicroseconds(pulseWidth);  // pulse width
+    // digitalWrite(pin, LOW);    // stop the pulse
+
   // 03(3) Read
   } else if (atoi(val) == 3) {
     Serial.println("reading servo");
@@ -250,15 +264,42 @@ void handleServo(char *pin, char *val, char *aux) {
   }
 }
 
-/*
- * Handle RC commands
- * handleRCTriState("10", "0FFF0FFFFF0F")
- */
-void handleRCTriState(char *pin, char *val) {
-  int p = getPin(pin);
-  if(p == -1) { if(debug) Serial.println("badpin"); return; }
-  if (debug) Serial.println("RC");
-  RCSwitch rc = RCSwitch();
-  rc.enableTransmit(p);
-  rc.sendTriState(val);
+void sendRCOn(char *pin, char *val) {
+    Serial.print("Turning on rf light on channel: ");
+    int p = getPin(pin);
+    Serial.print(val[0]);
+    Serial.print(" device: ");
+    Serial.println(val[1]);
+
+    char device[2];
+    device[0] = val[1];
+    device[1] = '\0';
+    
+    rc.enableTransmit(getPin(pin));
+    rc.setPulseLength(100);
+
+    // Set Protocol (3 is used for switches without a chassis-mounted method for switching channel)
+    rc.setProtocol(3);
+
+    rc.switchOn(val[0], atoi(device));
+}
+
+void sendRCOff(char *pin, char *val) {
+    Serial.print("Turning off rf light on channel: ");
+    int p = getPin(pin);
+    Serial.print(val[0]);
+    Serial.print(" device: ");
+    Serial.println(val[1]);
+
+    char device[2];
+    device[0] = val[1];
+    device[1] = '\0';
+
+    rc.enableTransmit(getPin(pin));
+    rc.setPulseLength(100);
+
+    // Set Protocol (3 is used for switches without a chassis-mounted method for switching channel)
+    rc.setProtocol(3);
+
+    rc.switchOff(val[0], atoi(device));
 }

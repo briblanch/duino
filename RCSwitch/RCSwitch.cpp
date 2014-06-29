@@ -239,5 +239,11 @@ void RCSwitch::sendEnd(char cChannel) {
 		this->send0();
 		this->send1();
 	}
+	if (cChannel == 'E') {
+		this->send1();
+		this->send1();
+		this->send0();
+		this->send0();
+	}
 
 }
