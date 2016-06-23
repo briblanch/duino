@@ -1,5 +1,8 @@
+#include <RCSwitch.h>
+
 #include <Servo.h>
 
+RCSwitch rf = RCSwitch();
 
 bool debug = false;
 
@@ -15,6 +18,11 @@ Servo servo;
 
 void setup() {
   Serial.begin(115200);
+  // Optional set pulse length.
+   rf.setPulseLength(190);
+  
+   // Optional set number of transmission repetitions.
+   rf.setRepeatTransmit(15);
 }
 
 void loop() {
@@ -54,7 +62,7 @@ void process() {
   }
   int cmdid = atoi(cmd);
 
-  // Serial.println(cmd);
+   Serial.println(cmd);
   // Serial.println(pin);
   // Serial.println(val);
   // Serial.println(aux);
@@ -65,11 +73,45 @@ void process() {
     case 2:  dr(pin,val);              break;
     case 3:  aw(pin,val);              break;
     case 4:  ar(pin,val);              break;
+    case 95: rfOn(pin, val);           break;
+    case 96: rfOff(pin, val);          break;
     case 97: handlePing(pin,val,aux);  break;
     case 98: handleServo(pin,val,aux); break;
     case 99: toggleDebug(val);         break;
     default:                           break;
   }
+}
+
+void rfOn(char*pin, char *val) {
+  int lightSwitch = atoi(val);
+
+  rf.enableTransmit(getPin(pin));
+
+  switch(lightSwitch) {
+    case 1:
+      rf.sendTriState("FFF00FFF0101");
+      break;
+    case 2:
+      rf.sendTriState("FFF00FFF1001");
+      break;   
+  }
+    
+  Serial.println("Hit RF On");  
+}
+
+void rfOff(char*pin, char *val) {
+  int lightSwitch = atoi(val);
+
+  rf.enableTransmit(getPin(pin));
+
+  switch(lightSwitch) {
+    case 1:
+      rf.sendTriState("FFF00FFF0110");
+      break;
+    case 2:
+      rf.sendTriState("FFF00FFF1010");
+      break;   
+  } 
 }
 
 /*
